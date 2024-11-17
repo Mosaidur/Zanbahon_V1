@@ -4,33 +4,37 @@ require 'Connection.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-switch ($method) {
-    case 'POST':
-        createUser();
-        break;
-    case 'GET':
-        if (isset($_GET['id'])) {
-            getUser($_GET['id']);
-        } else {
-            getUsers();
-        }
-        break;
-    case 'PUT':
-        updateUser();
-        break;
-    case 'DELETE':
-        if (isset($_GET['id'])) {
-            deleteUser($_GET['id']);
-        } else {
-            echo json_encode(["message" => "User ID required"]);
-        }
-        break;
-    default:
-        echo json_encode(["message" => "Method not supported"]);
-        break;
+try {
+    switch ($method) {
+        case 'POST':
+            createUser();
+            break;
+        case 'GET':
+            if (isset($_GET['id'])) {
+                getUser($_GET['id']);
+            } else {
+                getUsers();
+            }
+            break;
+        case 'PUT':
+            updateUser();
+            break;
+        case 'DELETE':
+            if (isset($_GET['id'])) {
+                deleteUser($_GET['id']);
+            } else {
+                echo json_encode(["message" => "User ID required"]);
+            }
+            break;
+        default:
+            echo json_encode(["message" => "Method not supported"]);
+            break;
+    }
+} catch (Exception $e) {
+    echo json_encode(["message" => "An unexpected error occurred", "error" => $e->getMessage()]);
 }
 
-function createUser()
+function createUser(): void
 {
     global $pdo;
     $data = json_decode(file_get_contents("php://input"), true);
@@ -43,10 +47,21 @@ function createUser()
         $password = password_hash($data['password'], PASSWORD_DEFAULT);
         $roleId = $data['role_id'];
 
-        $stmt = $pdo->prepare("INSERT INTO User (Name, Email, NID, Phone, Password, RoleId) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $email, $nid, $phone, $password, $roleId]);
+        try {
+            // Check for duplicate email
+            $stmt = $pdo->prepare("SELECT * FROM User WHERE Email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                echo json_encode(["status" => 200, "message" => "Email already exists"]);
+                return;
+            }
 
-        echo json_encode(["message" => "User created successfully", "UserId" => $pdo->lastInsertId()]);
+            $stmt = $pdo->prepare("INSERT INTO User (Name, Email, NID, Phone, Password, RoleId) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $email, $nid, $phone, $password, $roleId]);
+            echo json_encode(["message" => "User created successfully", "UserId" => $pdo->lastInsertId()]);
+        } catch (PDOException $e) {
+            echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        }
     } else {
         echo json_encode(["message" => "Invalid input"]);
     }
@@ -55,24 +70,32 @@ function createUser()
 function getUser($id)
 {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT * FROM User WHERE UserId = ?");
-    $stmt->execute([$id]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM User WHERE UserId = ?");
+        $stmt->execute([$id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user) {
-        echo json_encode($user);
-    } else {
-        echo json_encode(["message" => "User not found"]);
+        if ($user) {
+            echo json_encode(["status"=>200 , "users" => $user]);
+        } else {
+            echo json_encode(["status" => 200, "message" => "User not found"]);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
 
 function getUsers()
 {
     global $pdo;
-    $stmt = $pdo->query("SELECT * FROM User");
-    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->query("SELECT * FROM User");
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    echo json_encode($users);
+        echo json_encode(["status"=>200 , "users" => $users]);
+    } catch (PDOException $e) {
+        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+    }
 }
 
 function updateUser()
@@ -89,10 +112,14 @@ function updateUser()
         $userStatus = $data['user_status'];
         $roleId = $data['role_id'];
 
-        $stmt = $pdo->prepare("UPDATE User SET Name = ?, Email = ?, NID = ?, Phone = ?, User_Status = ?, RoleId = ?, Last_Updated = NOW() WHERE UserId = ?");
-        $stmt->execute([$name, $email, $nid, $phone, $userStatus, $roleId, $id]);
+        try {
+            $stmt = $pdo->prepare("UPDATE User SET Name = ?, Email = ?, NID = ?, Phone = ?, User_Status = ?, RoleId = ?, Last_Updated = NOW() WHERE UserId = ?");
+            $stmt->execute([$name, $email, $nid, $phone, $userStatus, $roleId, $id]);
 
-        echo json_encode(["message" => "User updated successfully"]);
+            echo json_encode(["status" => 200, "message" => "User updated successfully"]);
+        } catch (PDOException $e) {
+            echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        }
     } else {
         echo json_encode(["message" => "Invalid input"]);
     }
@@ -101,13 +128,17 @@ function updateUser()
 function deleteUser($id)
 {
     global $pdo;
-    $stmt = $pdo->prepare("DELETE FROM User WHERE UserId = ?");
-    $stmt->execute([$id]);
+    try {
+        $stmt = $pdo->prepare("DELETE FROM User WHERE UserId = ?");
+        $stmt->execute([$id]);
 
-    if ($stmt->rowCount()) {
-        echo json_encode(["message" => "User deleted successfully"]);
-    } else {
-        echo json_encode(["message" => "User not found"]);
+        if ($stmt->rowCount()) {
+            echo json_encode(["status" => 200, "message" => "User deleted successfully"]);
+        } else {
+            echo json_encode(["status" => 200, "message" => "User not found"]);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
 ?>
