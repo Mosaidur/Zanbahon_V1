@@ -14,7 +14,7 @@ try {
             break;
         case 'GET':
             if (isset($_GET['id'])) {
-                getRide($_GET['id']);
+                getRideByRiderID($_GET['id']);
             } else {
                 getRides();
             }
@@ -42,7 +42,7 @@ function createRide(): void
     global $pdo;
     $data = json_decode(file_get_contents("php://input"), true);
 
-    if (isset($data['rider_id'], $data['pickup_location'], $data['drop_location'], $data['total_fare_amount'], $data['total_distance'], $data['total_time'], $data['approximate_time'])) {
+    if (isset($data['rider_id'], $data['pickup_location'], $data['drop_location'], $data['total_fare_amount'], $data['total_distance'], $data['approximate_time'])) {
         $riderId = $data['rider_id'];
         $driverId = $data['driver_id'] ?? null;
         $vehicleId = $data['vehicle_id'] ?? null;
@@ -55,7 +55,7 @@ function createRide(): void
         $rideStatus = $data['ride_status'] ?? 'Requested';
         $rideCancelledReason = $data['ride_cancelled_reason'] ?? null;
         $totalFareAmount = $data['total_fare_amount']?? null;
-        $totalDistance = $data['total_distance']?? null;
+        $totalDistance = $data['total_distance'];
         $totalTime = $data['total_time']?? null;
         $approximateTime = $data['approximate_time']?? null;
 
@@ -71,23 +71,27 @@ function createRide(): void
     }
 }
 
-function getRide($id)
+function getRideByRiderID($id)
 {
     global $pdo;
     try {
-        $stmt = $pdo->prepare("SELECT * FROM Ride WHERE RideId = ?");
-        $stmt->execute([$id]);
-        $ride = $stmt->fetch(PDO::FETCH_ASSOC);
+        // Prepare the query to fetch all rides for the given RiderId or DriverId
+        $stmt = $pdo->prepare("SELECT * FROM Ride WHERE RiderId = ? OR DriverId = ?");
+        $stmt->execute([$id, $id]);
+        
+        // Fetch all matching rows
+        $rides = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if ($ride) {
-            echo json_encode(["status" => 200, "ride" => $ride]);
+        if ($rides) {
+            echo json_encode(["status" => 200, "rides" => $rides]);
         } else {
-            echo json_encode(["status" => 200, "message" => "Ride not found"]);
+            echo json_encode(["status" => 200, "message" => "No rides found for this Rider or Driver"]);
         }
     } catch (PDOException $e) {
         echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 
 function getRides()
 {

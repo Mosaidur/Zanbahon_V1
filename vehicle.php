@@ -46,11 +46,17 @@ function createVehicle(): void
     $data = json_decode(file_get_contents("php://input"), true);
 
     // Check if the required fields are present in the request data
-    if (isset($data['UserId'], $data['VehicleNumber'], $data['VehicleType'], $data['Capacity'], $data['OwnerName'], $data['OwnerContact'])) {
+    if (isset($data['UserId'], $data['VehicleNumber'], $data['VehicleType'], $data['Capacity'], $data['OwnerName'], $data['OwnerContact'], $data['perKMRate'])) {
         
         // Check if vehicle_number is present and not empty
         if (empty($data['VehicleNumber'])) {
             echo json_encode(["message" => "Vehicle number is required"]);
+            return;
+        }
+
+        // Check if perKMRate is valid and not null
+        if (empty($data['perKMRate']) || !is_numeric($data['perKMRate'])) {
+            echo json_encode(["message" => "perKMRate is required and must be a number"]);
             return;
         }
 
@@ -62,6 +68,7 @@ function createVehicle(): void
         $ownerContact = $data['OwnerContact'] ?? null;
         $vehicleInfo = $data['VehicleInfo'] ?? null;  // Optional BLOB field
         $vehicleVerification = $data['VehicleVerification'] ?? false;  // Default false if not provided
+        $perKMRate = $data['perKMRate'];  // perKMRate is required and must be numeric
 
         try {
             // Check if the vehicle number already exists
@@ -73,8 +80,8 @@ function createVehicle(): void
             }
 
             // Insert the new vehicle into the database
-            $stmt = $pdo->prepare("INSERT INTO Vehicle (UserId, VehicleNumber, VehicleType, Capacity, OwnerName, OwnerContact, VehicleInfo, Vehicle_verification)
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO Vehicle (UserId, VehicleNumber, VehicleType, Capacity, OwnerName, OwnerContact, VehicleInfo, Vehicle_verification, perKMRate)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             // If vehicleInfo is binary data, ensure it is correctly inserted (use PDO::PARAM_LOB for BLOB)
             $stmt->execute([
                 $userId,
@@ -84,7 +91,8 @@ function createVehicle(): void
                 $ownerName,
                 $ownerContact,
                 $vehicleInfo,  // This should be the binary data, passed as is
-                $vehicleVerification
+                $vehicleVerification,
+                $perKMRate  // Insert the perKMRate value
             ]);
             echo json_encode(["status" => 200, "message" => "Vehicle created successfully", "VehicleId" => $pdo->lastInsertId()]);
         } catch (PDOException $e) {
@@ -94,6 +102,7 @@ function createVehicle(): void
         echo json_encode(["message" => "Invalid input"]);
     }
 }
+
 
 
 function getVehicle($id)
