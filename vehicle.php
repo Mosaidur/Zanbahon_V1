@@ -141,7 +141,7 @@ function updateVehicle()
     global $pdo;
     $data = json_decode(file_get_contents("php://input"), true);
 
-    if (isset($data['VehicleId'], $data['UserId'], $data['VehicleNumber'], $data['VehicleType'], $data['Capacity'], $data['OwnerName'], $data['OwnerContact'])) {
+    if (isset($data['VehicleId'], $data['UserId'], $data['VehicleNumber'], $data['VehicleType'], $data['Capacity'], $data['OwnerName'], $data['OwnerContact'], $data['perKMRate'])) {
         $vehicleId = $data['VehicleId'];
         $userId = $data['UserId'];
         $vehicleNumber = $data['VehicleNumber'];
@@ -151,10 +151,27 @@ function updateVehicle()
         $ownerContact = $data['OwnerContact'];
         $vehicleInfo = isset($data['VehicleInfo']) ? $data['VehicleInfo'] : null; // Optional BLOB field
         $vehicleVerification = isset($data['VehicleVerification']) ? $data['VehicleVerification'] : false; // Default false if not provided
+        $perKMRate = $data['perKMRate']; // perKMRate is required and must be a number
+
+        // Check if perKMRate is valid and not null
+        if (empty($perKMRate) || !is_numeric($perKMRate)) {
+            echo json_encode(["message" => "perKMRate is required and must be a number"]);
+            return;
+        }
 
         try {
             // Update vehicle information in the database
-            $stmt = $pdo->prepare("UPDATE Vehicle SET UserId = ?, VehicleNumber = ?, VehicleType = ?, Capacity = ?, OwnerName = ?, OwnerContact = ?, VehicleInfo = ?, Vehicle_verification = ?, Last_Updated = NOW() 
+            $stmt = $pdo->prepare("UPDATE Vehicle SET 
+                                   UserId = ?, 
+                                   VehicleNumber = ?, 
+                                   VehicleType = ?, 
+                                   Capacity = ?, 
+                                   OwnerName = ?, 
+                                   OwnerContact = ?, 
+                                   VehicleInfo = ?, 
+                                   Vehicle_verification = ?, 
+                                   perKMRate = ?, 
+                                   Last_Updated = NOW() 
                                    WHERE VehicleId = ?");
             $stmt->execute([
                 $userId,
@@ -165,6 +182,7 @@ function updateVehicle()
                 $ownerContact,
                 $vehicleInfo, // This can be binary data
                 $vehicleVerification,
+                $perKMRate, // Update perKMRate
                 $vehicleId
             ]);
 
@@ -176,6 +194,7 @@ function updateVehicle()
         echo json_encode(["message" => "Invalid input"]);
     }
 }
+
 
 function deleteVehicle($id)
 {
