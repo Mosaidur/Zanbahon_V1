@@ -1,5 +1,10 @@
 <?php
 // Include the database connection file
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
 require 'Connection.php'; // Assuming 'Connection.php' is properly set up with PDO
 
 // Include PHPMailer classes and use the correct namespace
