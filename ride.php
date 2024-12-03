@@ -15,7 +15,7 @@ try {
         case 'GET':
             if (isset($_GET['id'])) {
                 getRideByRiderID($_GET['id']);
-            } elseif(isset($_GET['id'])){
+            } elseif(isset($_GET['status'])){
                 getRideByRideStatus($status);
             }
             else {
@@ -95,7 +95,7 @@ function createService(): void
         $serviceName = $data['service_name'] ?? 'Ride Share';
 
         try {
-            $stmt = $pdo->prepare("INSERT INTO Services (RiderId, DriverId, VehicleId, PickupLocation, DropLocation, PickupLatitude, PickupLongitude, DropLatitude, DropLongitude, RideStatus, RideCancelledReason, TotalFareAmount, TotalDistance, TotalTime, ApproximateTime, ServiceName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO services (RiderId, DriverId, VehicleId, PickupLocation, DropLocation, PickupLatitude, PickupLongitude, DropLatitude, DropLongitude, RideStatus, RideCancelledReason, TotalFareAmount, TotalDistance, TotalTime, ApproximateTime, ServiceName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$riderId, $driverId, $vehicleId, $pickupLocation, $dropLocation, $pickupLatitude, $pickupLongitude, $dropLatitude, $dropLongitude, $rideStatus, $rideCancelledReason, $totalFareAmount, $totalDistance, $totalTime, $approximateTime, $serviceName]);
             echo json_encode(["message" => "Service created successfully", "ServiceId" => $pdo->lastInsertId()]);
         } catch (PDOException $e) {
@@ -112,7 +112,7 @@ function getRideByRiderID($id)
     global $pdo;
     try {
         // Prepare the query to fetch all rides for the given RiderId or DriverId
-        $stmt = $pdo->prepare("SELECT * FROM Services WHERE RiderId = ? OR DriverId = ?");
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE RiderId = ? OR DriverId = ?");
         $stmt->execute([$id, $id]);
         
         // Fetch all matching rows
@@ -121,33 +121,46 @@ function getRideByRiderID($id)
         if ($rides) {
             echo json_encode(["status" => 200, "rides" => $rides]);
         } else {
-            echo json_encode(["status" => 200, "message" => "No rides found for this Rider or Driver"]);
+            echo json_encode(["status" => 200, "message" => "No rides found for the provided Rider or Driver ID"]);
         }
     } catch (PDOException $e) {
-        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 
 
 function getRides()
 {
     global $pdo;
     try {
-        $stmt = $pdo->query("SELECT * FROM Services");
+        $stmt = $pdo->query("SELECT * FROM services");
         $rides = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        echo json_encode(["status" => 200, "rides" => $rides]);
+        if ($rides) {
+            echo json_encode(["status" => 200, "rides" => $rides]);
+        } else {
+            echo json_encode(["status" => 200, "message" => "No rides found"]);
+        }
     } catch (PDOException $e) {
-        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 
 function getRideByRideStatus($status)
 {
     global $pdo;
+
+    // Validate that the status is not empty
+    if (empty($status)) {
+        echo json_encode(["status" => 400, "message" => "Invalid or empty status parameter"]);
+        return;
+    }
+
     try {
         // Prepare the query to fetch rides with the given RideStatus
-        $stmt = $pdo->prepare("SELECT * FROM Services WHERE RideStatus = ?");
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE RideStatus = ?");
         $stmt->execute([$status]);
         
         // Fetch all matching rows
@@ -159,9 +172,10 @@ function getRideByRideStatus($status)
             echo json_encode(["status" => 200, "message" => "No rides found with the specified status"]);
         }
     } catch (PDOException $e) {
-        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 
 
 function updateRide()
@@ -169,57 +183,129 @@ function updateRide()
     global $pdo;
     $data = json_decode(file_get_contents("php://input"), true);
 
-    if (isset($data['ride_id'], $data['ride_status'], $data['ride_cancelled_reason'], $data['ride_accept_time'], $data['ride_start_time'], $data['ride_end_time'], $data['ride_rating'])) {
-        $rideId = $data['ride_id'];
-        $rideStatus = $data['ride_status'];
-        $rideCancelledReason = $data['ride_cancelled_reason'] ?? null;
-        $rideAcceptTime = $data['ride_accept_time'] ?? null;
-        $rideStartTime = $data['ride_start_time'] ?? null;
-        $rideEndTime = $data['ride_end_time'] ?? null;
-        $rideRating = $data['ride_rating'] ?? null;
+    // Check if the ride_id is set, as it's a mandatory field
+    if (!isset($data['ride_id'])) {
+        echo json_encode(["status" => 400, "message" => "Missing required field: ride_id"]);
+        return;
+    }
 
-        try {
-            $stmt = $pdo->prepare("UPDATE Services SET RideStatus = ?, RideCancelledReason = ?, RideAcceptTime = ?, RideStartTime = ?, RideEndTime = ?, RideRating = ?, Last_Updated = NOW() WHERE RideId = ?");
-            $stmt->execute([$rideStatus, $rideCancelledReason, $rideAcceptTime, $rideStartTime, $rideEndTime, $rideRating, $rideId]);
+    // Validate ride_rating if provided
+    if (isset($data['ride_rating']) && !is_numeric($data['ride_rating'])) {
+        echo json_encode(["status" => 400, "message" => "Invalid rating value. It should be a number."]);
+        return;
+    }
 
-            echo json_encode(["status" => 200, "message" => "Ride updated successfully"]);
-        } catch (PDOException $e) {
-            echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+    // Validate if ride_id exists in the database
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE RideId = ?");
+        $stmt->execute([$data['ride_id']]);
+        $ride = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$ride) {
+            echo json_encode(["status" => 400, "message" => "Ride not found"]);
+            return;
         }
-    } else {
-        echo json_encode(["message" => "Invalid input"]);
+    } catch (PDOException $e) {
+        echo json_encode(["status" => 500, "message" => "An error occurred while checking the ride", "error" => $e->getMessage()]);
+        return;
+    }
+
+    // Proceed with updating if ride exists
+    $rideId = $data['ride_id'];
+    $rideStatus = $data['ride_status'] ?? null;
+    $rideCancelledReason = $data['ride_cancelled_reason'] ?? null;
+    $rideAcceptTime = $data['ride_accept_time'] ?? null;
+    $rideStartTime = $data['ride_start_time'] ?? null;
+    $rideEndTime = $data['ride_end_time'] ?? null;
+    $rideRating = $data['ride_rating'] ?? null;
+
+    try {
+        $stmt = $pdo->prepare("UPDATE services SET 
+                               RideStatus = ?, RideCancelledReason = ?, RideAcceptTime = ?, 
+                               RideStartTime = ?, RideEndTime = ?, RideRating = ?, Last_Updated = NOW() 
+                               WHERE RideId = ?");
+        $stmt->execute([$rideStatus, $rideCancelledReason, $rideAcceptTime, 
+                        $rideStartTime, $rideEndTime, $rideRating, $rideId]);
+
+        echo json_encode(["status" => 200, "message" => "Ride updated successfully"]);
+    } catch (PDOException $e) {
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 
 function updateRideFromDriverSide($rideId, $driverId, $vehicleId, $rideStatus, $rideAcceptTime)
 {
     global $pdo;
     try {
-        // Prepare the SQL query to update the ride information
-        $stmt = $pdo->prepare("UPDATE Ride 
+        // Step 1: Validate the input parameters
+        if (empty($rideId) || empty($driverId) || empty($vehicleId) || empty($rideStatus) || empty($rideAcceptTime)) {
+            echo json_encode(["status" => 400, "message" => "All fields are required"]);
+            return;
+        }
+
+        // Step 2: Validate the rideAcceptTime format
+        try {
+            $rideAcceptTimeObj = new DateTime($rideAcceptTime); // Validate date format
+        } catch (Exception $e) {
+            echo json_encode(["status" => 400, "message" => "Invalid rideAcceptTime format"]);
+            return;
+        }
+
+        // Step 3: Check if the ride exists
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE RideId = ?");
+        $stmt->execute([$rideId]);
+        $ride = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$ride) {
+            echo json_encode(["status" => 400, "message" => "Ride not found"]);
+            return;
+        }
+
+        // Step 4: Prepare the SQL query to update the ride information
+        $stmt = $pdo->prepare("UPDATE services 
                                SET DriverId = ?, VehicleId = ?, RideStatus = ?, RideAcceptTime = ? 
                                WHERE RideId = ?");
-        
+
         // Execute the query with the provided parameters
         $stmt->execute([$driverId, $vehicleId, $rideStatus, $rideAcceptTime, $rideId]);
 
-        // Check if any row was affected (i.e., if the ride was updated)
+        // Step 5: Check if any row was affected (i.e., if the ride was updated)
         if ($stmt->rowCount() > 0) {
             echo json_encode(["status" => 200, "message" => "Ride updated successfully"]);
         } else {
             echo json_encode(["status" => 400, "message" => "Failed to update ride or ride not found"]);
         }
     } catch (PDOException $e) {
-        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 
 function updateRideStart($rideId, $startTime)
 {
     global $pdo;
     try {
-        // Update the RideStatus to 'In Progress' and set the RideStartTime
-        $stmt = $pdo->prepare("UPDATE Services 
+        // Step 1: Check if the ride exists
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE RideId = ?");
+        $stmt->execute([$rideId]);
+        $ride = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$ride) {
+            echo json_encode(["status" => 400, "message" => "Ride not found"]);
+            return;
+        }
+
+        // Step 2: Validate the start time format
+        try {
+            $startTimeObj = new DateTime($startTime); // Check if the start time is in a valid format
+        } catch (Exception $e) {
+            echo json_encode(["status" => 400, "message" => "Invalid start time format"]);
+            return;
+        }
+
+        // Step 3: Update the RideStatus to 'Started' and set the RideStartTime
+        $stmt = $pdo->prepare("UPDATE services 
                                SET RideStatus = 'Started', RideStartTime = ? 
                                WHERE RideId = ?");
         $stmt->execute([$startTime, $rideId]);
@@ -227,19 +313,20 @@ function updateRideStart($rideId, $startTime)
         if ($stmt->rowCount() > 0) {
             echo json_encode(["status" => 200, "message" => "Ride started successfully"]);
         } else {
-            echo json_encode(["status" => 400, "message" => "Failed to update ride or ride not found"]);
+            echo json_encode(["status" => 400, "message" => "Failed to update ride"]);
         }
     } catch (PDOException $e) {
-        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 
 function updateRideEnd($rideId, $endTime)
 {
     global $pdo;
     try {
         // Step 1: Fetch the RideStartTime from the database for the ride
-        $stmt = $pdo->prepare("SELECT RideStartTime FROM Services WHERE RideId = ?");
+        $stmt = $pdo->prepare("SELECT RideStartTime FROM services WHERE RideId = ?");
         $stmt->execute([$rideId]);
         $ride = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -249,15 +336,20 @@ function updateRideEnd($rideId, $endTime)
         }
 
         $rideStartTime = $ride['RideStartTime'];
-        
-        // Step 2: Calculate the total time by getting the difference between the start and end times
-        $startTime = new DateTime($rideStartTime);
-        $endTime = new DateTime($endTime);
-        $interval = $startTime->diff($endTime);
-        $totalTime = $interval->format('%h:%i:%s'); // Format the time as hours:minutes:seconds
+
+        // Step 2: Validate end time format and calculate the total time
+        try {
+            $startTime = new DateTime($rideStartTime);
+            $endTimeObj = new DateTime($endTime);
+            $interval = $startTime->diff($endTimeObj);
+            $totalTime = $interval->format('%h:%i:%s'); // Format the time as hours:minutes:seconds
+        } catch (Exception $e) {
+            echo json_encode(["status" => 400, "message" => "Invalid end time format"]);
+            return;
+        }
 
         // Step 3: Update the RideEndTime, RideStatus, and TotalTime
-        $stmt = $pdo->prepare("UPDATE Ride
+        $stmt = $pdo->prepare("UPDATE services
                                SET RideEndTime = ?, RideStatus = 'Complete', TotalTime = ?
                                WHERE RideId = ?");
         $stmt->execute([$endTime, $totalTime, $rideId]);
@@ -268,16 +360,22 @@ function updateRideEnd($rideId, $endTime)
             echo json_encode(["status" => 400, "message" => "Failed to update ride or ride not found"]);
         }
     } catch (PDOException $e) {
-        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
 
+
 function updateRideCancel($rideId, $cancelReason)
 {
+    if (empty($rideId) || empty($cancelReason)) {
+        echo json_encode(["status" => 400, "message" => "Missing required parameters: rideId or cancelReason"]);
+        return;
+    }
+
     global $pdo;
     try {
         // Step 1: Check if the ride exists
-        $stmt = $pdo->prepare("SELECT * FROM Services WHERE RideId = ?");
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE RideId = ?");
         $stmt->execute([$rideId]);
         $ride = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -287,7 +385,7 @@ function updateRideCancel($rideId, $cancelReason)
         }
 
         // Step 2: Update the RideStatus to 'Cancelled' and set the cancellation reason
-        $stmt = $pdo->prepare("UPDATE Ride 
+        $stmt = $pdo->prepare("UPDATE services 
                                SET RideStatus = 'Cancelled', RideCancelledReason = ?
                                WHERE RideId = ?");
         $stmt->execute([$cancelReason, $rideId]);
@@ -303,20 +401,28 @@ function updateRideCancel($rideId, $cancelReason)
 }
 
 
+
 function deleteRide($id)
 {
+    if (empty($id)) {
+        echo json_encode(["status" => 400, "message" => "Missing ride ID"]);
+        return;
+    }
+
     global $pdo;
     try {
-        $stmt = $pdo->prepare("DELETE FROM Services WHERE RideId = ?");
+        // Attempt to delete the ride from the database
+        $stmt = $pdo->prepare("DELETE FROM services WHERE RideId = ?");
         $stmt->execute([$id]);
 
         if ($stmt->rowCount()) {
             echo json_encode(["status" => 200, "message" => "Ride deleted successfully"]);
         } else {
-            echo json_encode(["status" => 200, "message" => "Ride not found"]);
+            echo json_encode(["status" => 404, "message" => "Ride not found"]);
         }
     } catch (PDOException $e) {
-        echo json_encode(["message" => "An error occurred", "error" => $e->getMessage()]);
+        echo json_encode(["status" => 500, "message" => "An error occurred", "error" => $e->getMessage()]);
     }
 }
+
 ?>
