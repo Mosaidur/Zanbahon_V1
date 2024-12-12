@@ -89,7 +89,7 @@ function handleCreatePaymentRequest()
                 ':Amount' => $data['Amount'],
                 ':PaymentMethod' => $data['PaymentMethod'],
                 ':PaymentStatus' => $data['PaymentStatus'] ?? 'Pending',
-                ':TransactionId' => $data['TransactionId'],
+                ':TransactionId' => $data['TransactionId'], // here use rideId for join two table 
                 ':SenderAccountNumber' => $data['SenderAccountNumber'] ?? null,
                 ':ReceiverAccountNumber' => $data['ReceiverAccountNumber'] ?? null,
             ]);
