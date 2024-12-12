@@ -63,7 +63,7 @@ function handleCreatePaymentRequest()
     $data = json_decode(file_get_contents("php://input"), true);
 
     // Check if all required fields are provided
-    if (isset($data['SenderId'], $data['ReceiverId'], $data['ServiceType'], $data['Amount'], $data['PaymentMethod'], $data['TransactionId'])) {
+    if (isset($data['SenderId'], $data['Amount'], $data['PaymentMethod'], $data['TransactionId'])) {
         
         // First, check if the TransactionId already exists
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM Payments WHERE TransactionId = :TransactionId");
@@ -83,12 +83,12 @@ function handleCreatePaymentRequest()
 
             $stmt->execute([
                 ':SenderId' => $data['SenderId'],
-                ':ReceiverId' => $data['ReceiverId'],
-                ':ServiceType' => $data['ServiceType'],
+                ':ReceiverId' => $data['ReceiverId'] ?? 1,
+                ':ServiceType' => $data['ServiceType'] ?? 'no',
                 ':ServiceId' => $data['ServiceId'] ?? null,
                 ':Amount' => $data['Amount'],
                 ':PaymentMethod' => $data['PaymentMethod'],
-                ':PaymentStatus' => $data['PaymentStatus'] ?? 'Pending',
+                ':PaymentStatus' => $data['PaymentStatus'] ?? 'Paid',
                 ':TransactionId' => $data['TransactionId'],
                 ':SenderAccountNumber' => $data['SenderAccountNumber'] ?? null,
                 ':ReceiverAccountNumber' => $data['ReceiverAccountNumber'] ?? null,
