@@ -5,6 +5,9 @@ header("Access-Control-Allow-Methods: POST");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 require '../Connection.php';
 
+
+//Here you create ride and
+
 try {
     $data = json_decode(file_get_contents("php://input"), true);
     if (isset($data['rider_id'], $data['pickup_location'], $data['drop_location'], $data['total_fare_amount'], $data['total_distance'], $data['approximate_time'])) {
