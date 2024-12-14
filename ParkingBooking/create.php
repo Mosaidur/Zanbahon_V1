@@ -14,6 +14,7 @@ try {
         $parkingId = $data['parking_id'];
         $startTime = $data['parking_start_time'];
         $endTime = $data['parking_end_time'];
+        $ServiceProviderId = $data['ServiceProviderId'];
 
         // Check parking availability
         $availabilityStmt = $pdo->prepare("SELECT Status, RatePerHour, OvertimeRatePerHour FROM Parking WHERE ParkingId = ?");
@@ -40,8 +41,8 @@ try {
 
         // Insert booking request
         $bookingStmt = $pdo->prepare(
-            "INSERT INTO ParkingBooking (User_Id, VehicleId, ParkingId, ParkingStartTime, ParkingEndTime, RegularAmount, OvertimeAmount, TotalAmount, BookingStatus, PaymentStatus) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Accepted', 'Pending')"
+            "INSERT INTO ParkingBooking (User_Id, VehicleId, ParkingId, ParkingStartTime, ParkingEndTime, RegularAmount, OvertimeAmount, TotalAmount, BookingStatus, PaymentStatus,ServiceProviderId) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Accepted', 'Pending',?)"
         );
 
         $bookingStmt->execute([
@@ -52,7 +53,8 @@ try {
             $endTime,
             $regularAmount,
             $overtimeAmount,
-            $totalAmount
+            $totalAmount,
+            $ServiceProviderId
         ]);
 
         // Update parking status to Unavailable
